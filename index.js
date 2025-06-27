@@ -7,6 +7,8 @@ const path = require('path');
 const marked = require('marked');
 
 const Blog = require('./models/Blog');
+const authRoutes = require('./routes/auth');
+const authMiddleware = require('./middleware/authMiddleware');
 
 const app = express();
 
@@ -41,12 +43,16 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Bilarn Blog App API!');
 });
 
-// Create a new blog post
-app.post('/blogs', upload.single('image'), async (req, res) => {
+// Auth routes
+app.use('/auth', authRoutes);
+
+// Create a new blog post (protected)
+app.post('/blogs', authMiddleware, upload.single('image'), async (req, res) => {
   try {
     const { title, content } = req.body;
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
-    const blog = new Blog({ title, content, imageUrl });
+    const creator = req.user && req.user.username ? req.user.username : 'unknown';
+    const blog = new Blog({ title, content, imageUrl, creator });
     await blog.save();
     res.status(201).json(blog);
   } catch (err) {
@@ -76,8 +82,8 @@ app.get('/blogs/:id', async (req, res) => {
   }
 });
 
-// Update a blog post
-app.put('/blogs/:id', upload.single('image'), async (req, res) => {
+// Update a blog post (protected)
+app.put('/blogs/:id', authMiddleware, upload.single('image'), async (req, res) => {
   try {
     const { title, content } = req.body;
     const update = { title, content };
@@ -92,8 +98,8 @@ app.put('/blogs/:id', upload.single('image'), async (req, res) => {
   }
 });
 
-// Delete a blog post
-app.delete('/blogs/:id', async (req, res) => {
+// Delete a blog post (protected)
+app.delete('/blogs/:id', authMiddleware, async (req, res) => {
   try {
     const blog = await Blog.findByIdAndDelete(req.params.id);
     if (!blog) return res.status(404).json({ error: 'Blog not found' });
